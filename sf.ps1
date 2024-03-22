@@ -5615,47 +5615,48 @@ e.g. If you have a user-installed or core plugin that has a 'hello' command, ins
     }
 
   }
+}
 
-  # Get the current mode
-  $Mode = (Get-PSReadLineKeyHandler | Where-Object { $_.Key -eq "Tab" }).Function
+ # Get the current mode
+$Mode = (Get-PSReadLineKeyHandler | Where-Object { $_.Key -eq "Tab" }).Function
 
-  # Everything in the current line except the CLI executable name.
-  $CurrentLine = $commandAst.CommandElements[1..$commandAst.CommandElements.Count] -split " "
+# Everything in the current line except the CLI executable name.
+$CurrentLine = $commandAst.CommandElements[1..$commandAst.CommandElements.Count] -split " "
 
-  # Remove $WordToComplete from the current line.
-  if ($WordToComplete -ne "") {
+# Remove $WordToComplete from the current line.
+if ($WordToComplete -ne "") {
     if ($CurrentLine.Count -eq 1) {
-      $CurrentLine = @()
+        $CurrentLine = @()
     }
     else {
-      $CurrentLine = $CurrentLine[0..$CurrentLine.Count]
+        $CurrentLine = $CurrentLine[0..$CurrentLine.Count]
     }
-  }
+}
 
-  # Save flags in current line without the `--` prefix.
-  $Flags = $CurrentLine | Where-Object {
+# Save flags in current line without the `--` prefix.
+$Flags = $CurrentLine | Where-Object {
     $_ -Match "^-{1,2}(\w+)"
-  } | ForEach-Object {
+} | ForEach-Object {
     $_.trim("-")
-  }
-  # Set $flags to an empty hashtable if there are no flags in the current line.
-  if ($Flags -eq $null) {
+}
+# Set $flags to an empty hashtable if there are no flags in the current line.
+if ($Flags -eq $null) {
     $Flags = @{}
-  }
+}
 
-  # No command in the current line, suggest top-level args.
-  if ($CurrentLine.Count -eq 0) {
+# No command in the current line, suggest top-level args.
+if ($CurrentLine.Count -eq 0) {
     $Commands.GetEnumerator() | Where-Object {
-      $_.Key.StartsWith("$WordToComplete")
+        $_.Key.StartsWith("$WordToComplete")
     } | Sort-Object -Property Key | ForEach-Object {
-      New-Object -TypeName System.Management.Automation.CompletionResult -ArgumentList `
-      ($(if ($Mode -eq "MenuComplete") { "$($_.Key) " } else { "$($_.Key)" })),
-      $_.Key,
-      'ParameterValue',
-      ($_.Value._summary -or $_.Value._command.summary -or '')
+        New-Object -TypeName System.Management.Automation.CompletionResult -ArgumentList `
+            ($(if ($Mode -eq "MenuComplete") { "--$($_.Key) " } else { "--$($_.Key)" })),
+            $_.Key,
+            'ParameterValue',
+            ($_.Value._summary -or $_.Value._command.summary -or '')
     }
-  }
-  else {
+}
+else {
     # Start completing command/topic/coTopic
 
     $NextArg = $null
@@ -5663,75 +5664,75 @@ e.g. If you have a user-installed or core plugin that has a 'hello' command, ins
 
     # Iterate over the current line to find the command/topic/coTopic hashtable
     $CurrentLine | ForEach-Object {
-      if ($NextArg -eq $null) {
-        $NextArg = $Commands[$_]
-      }
-      elseif ($PrevNode[$_] -ne $null) {
-        $NextArg = $PrevNode[$_]
-      }
-      elseif ($_.StartsWith('-')) {
-        return
-      }
-      else {
-        $NextArg = $PrevNode
-      }
+        if ($NextArg -eq $null) {
+            $NextArg = $Commands[$_]
+        }
+        elseif ($PrevNode[$_] -ne $null) {
+            $NextArg = $PrevNode[$_]
+        }
+        elseif ($_.StartsWith('-')) {
+            return
+        }
+        else {
+            $NextArg = $PrevNode
+        }
 
-      $PrevNode = $NextArg
+        $PrevNode = $NextArg
     }
 
     # Start completing command.
     if ($NextArg._command -ne $null) {
-      # Complete flags
-      # `cli config list -<TAB>`
-      if ($WordToComplete -like '-*') {
-        $NextArg._command.flags.GetEnumerator() | Sort-Object -Property key | Where-Object {
-          # Filter out already used flags (unless `flag.multiple = true`).
-          $_.Key.StartsWith("$($WordToComplete.Trim("-"))") -and ($_.Value.multiple -eq $true -or !$flags.Contains($_.Key))
-      } | ForEach-Object {
-          New-Object -Type CompletionResult -ArgumentList `
-            $($Mode -eq "MenuComplete" ? "--$($_.Key) " : "--$($_.Key)"),
-              $_.Key,
-              "ParameterValue",
-              ($NextArg._command.flags[$_.Key].summary ?? '')
-      }
-      
-  }
-  else {
-      # This could be a coTopic. We remove the "_command" hashtable
-      # from $NextArg and check if there's a command under the current partial ID.
-      $NextArg.remove("_command")
+        # Complete flags
+        # `cli config list -<TAB>`
+        if ($WordToComplete -like '-*') {
+            $NextArg._command.flags.GetEnumerator() | Sort-Object -Property key | Where-Object {
+                # Filter out already used flags (unless `flag.multiple = true`).
+                $_.Key.StartsWith("$($WordToComplete.Trim("-"))") -and ($_.Value.multiple -eq $true -or !$flags.Contains($_.Key))
+            } | ForEach-Object {
+                New-Object -Type CompletionResult -ArgumentList `
+                    ($(if ($Mode -eq "MenuComplete") { "--$($_.Key) " } else { "--$($_.Key)" })),
+                    $_.Key,
+                    "ParameterValue",
+                    ($NextArg._command.flags[$_.Key].summary -or '')
+            }
+        }
+        else {
+            # This could be a coTopic. We remove the "_command" hashtable
+            # from $NextArg and check if there's a command under the current partial ID.
+            $NextArg.remove("_command")
 
-      if ($NextArg.keys -gt 0) {
-          $NextArg.GetEnumerator() | Where-Object {
-              $_.Key.StartsWith("$WordToComplete")
-          } | Sort-Object -Property key | ForEach-Object {
-              New-Object -Type CompletionResult -ArgumentList `
-                  $($Mode -eq "MenuComplete" ? "$($_.Key) " : "$($_.Key)"),
-                  $_.Key,
-                  "ParameterValue",
-                  ($NextArg[$_.Key]._summary ?? '')
-          }
-      }
-  }
-}
-else {
-  # Start completing topic.
+            if ($NextArg.keys -gt 0) {
+                $NextArg.GetEnumerator() | Where-Object {
+                    $_.Key.StartsWith("$WordToComplete")
+                } | Sort-Object -Property key | ForEach-Object {
+                    New-Object -Type CompletionResult -ArgumentList `
+                        ($(if ($Mode -eq "MenuComplete") { "$($_.Key) " } else { "$($_.Key)" })),
+                        $_.Key,
+                        "ParameterValue",
+                        ($NextArg[$_.Key]._summary -or '')
+                }
+            }
+        }
+    }
+    else {
+        # Start completing topic.
 
-  # Topic summary is stored as "_summary" in the hashtable.
-  # At this stage it is no longer needed so we remove it
-  # so that $NextArg contains only commands/topics hashtables
+        # Topic summary is stored as "_summary" in the hashtable.
+        # At this stage it is no longer needed so we remove it
+        # so that $NextArg contains only commands/topics hashtables
 
-  $NextArg.remove("_summary")
+        $NextArg.remove("_summary")
 
-  $NextArg.GetEnumerator() | Where-Object {
-      $_.Key.StartsWith("$WordToComplete")
-  } | Sort-Object -Property key | ForEach-Object {
-      New-Object -Type CompletionResult -ArgumentList `
-          $($Mode -eq "MenuComplete" ? "$($_.Key) " : "$($_.Key)"),
-          $_.Key,
-          "ParameterValue",
-          ($NextArg[$_.Key]._summary ?? $NextArg[$_.Key]._command.summary ?? '')
-  }
+        $NextArg.GetEnumerator() | Where-Object {
+            $_.Key.StartsWith("$WordToComplete")
+        } | Sort-Object -Property key | ForEach-Object {
+            New-Object -Type CompletionResult -ArgumentList `
+                ($(if ($Mode -eq "MenuComplete") { "$($_.Key) " } else { "$($_.Key)" })),
+                $_.Key,
+                "ParameterValue",
+                ($NextArg[$_.Key]._summary -or $NextArg[$_.Key]._command.summary -or '')
+        }
+    }
 }
 
 Register-ArgumentCompleter -Native -CommandName @("sfdx", "sf") -ScriptBlock $scriptblock
